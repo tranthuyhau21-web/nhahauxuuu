@@ -1,0 +1,1544 @@
+<!doctype html>
+
+<html lang="vi">
+
+  <head>
+
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>SMS Number Manager</title>
+
+    <style>
+
+      * {
+
+        box-sizing: border-box;
+
+      }
+
+      body {
+
+        margin: 0;
+
+        padding: 40px;
+
+        font-family: Inter, Arial, sans-serif;
+
+        background: #f5f7fb;
+
+        color: #1f2937;
+
+      }
+
+      .container {
+
+        max-width: 1450px;
+
+        margin: auto;
+
+      }
+
+      .card {
+
+        background: white;
+
+        border-radius: 14px;
+
+        padding: 24px;
+
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.06);
+
+      }
+
+      h2 {
+
+        margin-top: 0;
+
+      }
+
+      .token-row {
+
+        display: flex;
+
+        justify-content: flex-end;
+
+        gap: 10px;
+
+        margin-bottom: 18px;
+
+      }
+
+      .controls {
+
+        display: flex;
+
+        flex-wrap: wrap;
+
+        align-items: end;
+
+        gap: 12px;
+
+        margin-bottom: 24px;
+
+      }
+
+      .controls .field {
+
+        width: 170px;
+
+      }
+
+      .field label {
+
+        display: block;
+
+        font-size: 13px;
+
+        margin-bottom: 6px;
+
+        color: #6b7280;
+
+      }
+
+      input,
+
+      select {
+
+        width: 100%;
+
+        height: 42px;
+
+        border: 1px solid #d1d5db;
+
+        border-radius: 8px;
+
+        padding: 0 12px;
+
+        outline: none;
+
+        background: white;
+
+      }
+
+      input:focus,
+
+      select:focus {
+
+        border-color: #2563eb;
+
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+
+      }
+
+      .antd-select {
+
+        position: relative;
+
+        width: 100%;
+
+      }
+
+      .antd-select input {
+
+        padding: 0 58px 0 12px;
+
+        cursor: pointer;
+
+        transition:
+
+          border-color 0.2s,
+
+          box-shadow 0.2s;
+
+      }
+
+      .antd-select.open input,
+
+      .antd-select input:focus {
+
+        cursor: text;
+
+        border-color: #1677ff;
+
+        box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
+
+      }
+
+      .antd-select.disabled {
+
+        opacity: 0.55;
+
+      }
+
+      .select-arrow {
+
+        position: absolute;
+
+        right: 13px;
+
+        top: 17px;
+
+        width: 7px;
+
+        height: 7px;
+
+        border-right: 1.5px solid #8c8c8c;
+
+        border-bottom: 1.5px solid #8c8c8c;
+
+        transform: rotate(45deg);
+
+        pointer-events: none;
+
+        transition: transform 0.2s;
+
+      }
+
+      .antd-select.open .select-arrow {
+
+        top: 20px;
+
+        transform: rotate(225deg);
+
+      }
+
+      .select-clear {
+
+        display: none;
+
+        position: absolute;
+
+        right: 30px;
+
+        top: 12px;
+
+        width: 18px;
+
+        height: 18px;
+
+        padding: 0;
+
+        border-radius: 50%;
+
+        background: #bfbfbf;
+
+        color: white;
+
+        font-size: 14px;
+
+        line-height: 17px;
+
+        font-weight: 400;
+
+        z-index: 2;
+
+      }
+
+      .antd-select.has-value:hover .select-clear {
+
+        display: block;
+
+      }
+
+      .select-dropdown {
+
+        display: none;
+
+        position: absolute;
+
+        z-index: 1000;
+
+        top: calc(100% + 4px);
+
+        left: 0;
+
+        width: 100%;
+
+        max-height: 280px;
+
+        overflow-y: auto;
+
+        padding: 4px;
+
+        background: white;
+
+        border-radius: 8px;
+
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+
+      }
+
+      .antd-select.open .select-dropdown {
+
+        display: block;
+
+      }
+
+      .product-field .select-dropdown {
+
+        min-width: 480px;
+
+      }
+
+      .select-option {
+
+        padding: 8px 12px;
+
+        border-radius: 4px;
+
+        cursor: pointer;
+
+        font-size: 14px;
+
+        line-height: 22px;
+
+        white-space: nowrap;
+
+        overflow: hidden;
+
+        text-overflow: ellipsis;
+
+      }
+
+      .select-option:hover,
+
+      .select-option.active {
+
+        background: #f5f5f5;
+
+      }
+
+      .select-option.selected {
+
+        background: #e6f4ff;
+
+        font-weight: 600;
+
+      }
+
+      .select-option mark {
+
+        padding: 0;
+
+        background: transparent;
+
+        color: #1677ff;
+
+        font-weight: 600;
+
+      }
+
+      .select-empty {
+
+        padding: 14px 12px;
+
+        color: #8c8c8c;
+
+        text-align: center;
+
+        font-size: 14px;
+
+      }
+
+      button {
+
+        height: 42px;
+
+        border: 0;
+
+        border-radius: 8px;
+
+        padding: 0 20px;
+
+        cursor: pointer;
+
+        font-weight: 600;
+
+      }
+
+      button:disabled {
+
+        cursor: not-allowed;
+
+        opacity: 0.55;
+
+      }
+
+      .primary-btn {
+
+        align-self: end;
+
+        background: #2563eb;
+
+        color: white;
+
+      }
+
+      .primary-btn:hover:not(:disabled) {
+
+        background: #1d4ed8;
+
+      }
+
+      .secondary-btn {
+
+        align-self: end;
+
+        background: #e5e7eb;
+
+        color: #111827;
+
+      }
+
+      .danger-btn {
+
+        background: #fff1f0;
+
+        color: #cf1322;
+
+        border: 1px solid #ffa39e;
+
+      }
+
+      .danger-btn:hover:not(:disabled) {
+
+        background: #ffccc7;
+
+      }
+
+      .row-delete {
+
+        height: 30px;
+
+        padding: 0 12px;
+
+        background: transparent;
+
+        color: #cf1322;
+
+        border: 1px solid #ffccc7;
+
+      }
+
+      .row-delete:hover {
+
+        background: #fff1f0;
+
+        border-color: #ff7875;
+
+      }
+
+      .hint {
+
+        margin: -8px 0 20px;
+
+        color: #6b7280;
+
+        font-size: 12px;
+
+      }
+
+      .table-wrap {
+
+        overflow-x: auto;
+
+        max-width: 100%;
+
+      }
+
+      table {
+
+        width: 100%;
+
+        border-collapse: collapse;
+
+      }
+
+      th {
+
+        text-align: left;
+
+        background: #f9fafb;
+
+        padding: 13px;
+
+        font-size: 13px;
+
+        color: #6b7280;
+
+      }
+
+      td {
+
+        padding: 14px 13px;
+
+        border-top: 1px solid #eee;
+
+        white-space: nowrap;
+
+      }
+
+      .copy {
+
+        cursor: pointer;
+
+        font-family: monospace;
+
+        font-size: 14px;
+
+      }
+
+      .copy:hover {
+
+        color: #2563eb;
+
+        text-decoration: underline;
+
+      }
+
+      .status {
+
+        padding: 5px 10px;
+
+        border-radius: 20px;
+
+        font-size: 12px;
+
+        display: inline-block;
+
+      }
+
+      .waiting {
+
+        background: #fef3c7;
+
+        color: #92400e;
+
+      }
+
+      .success {
+
+        background: #dcfce7;
+
+        color: #166534;
+
+      }
+
+      .failed {
+
+        background: #fee2e2;
+
+        color: #991b1b;
+
+      }
+
+      .toast {
+
+        position: fixed;
+
+        right: 25px;
+
+        bottom: 25px;
+
+        max-width: 420px;
+
+        background: #111827;
+
+        color: white;
+
+        padding: 12px 18px;
+
+        border-radius: 8px;
+
+        opacity: 0;
+
+        transform: translateY(10px);
+
+        transition: 0.2s;
+
+        pointer-events: none;
+
+      }
+
+      .toast.show {
+
+        opacity: 1;
+
+        transform: translateY(0);
+
+      }
+
+      .product-options {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        width: 100%;
+        margin-bottom: 12px;
+      }
+
+      .product-option {
+        flex: 1;
+        min-width: 220px;
+        padding: 12px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: white;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      .product-option:hover {
+        border-color: #2563eb;
+      }
+
+      .product-option.selected {
+        border-color: #2563eb;
+        background: #eff6ff;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+      }
+
+      .product-option .product-name {
+        font-weight: 600;
+        margin-bottom: 5px;
+      }
+
+      .product-option .product-info {
+        font-size: 12px;
+        color: #6b7280;
+      }
+
+      .product-option .product-price {
+        color: #00a99d;
+        font-weight: 700;
+        margin-left: 5px;
+      }
+
+      @media (max-width: 600px) {
+
+        body {
+
+          padding: 12px;
+
+        }
+
+        .card {
+
+          padding: 16px;
+
+        }
+
+        h2 {
+
+          font-size: 20px;
+
+        }
+
+        .controls {
+
+          display: grid;
+
+          grid-template-columns: minmax(0, 1fr);
+
+          gap: 10px;
+
+        }
+
+        .controls .field,
+
+        .controls button,
+
+        .token-row button {
+
+          width: 100%;
+
+        }
+
+        .token-row {
+
+          justify-content: stretch;
+
+        }
+
+        .table-wrap {
+
+          overflow: visible;
+
+        }
+
+        table,
+
+        tbody,
+
+        tr,
+
+        td {
+
+          display: block;
+
+          width: 100%;
+
+        }
+
+        thead {
+
+          display: none;
+
+        }
+
+        tr {
+
+          margin-bottom: 12px;
+
+          padding: 8px 12px;
+
+          border: 1px solid #e5e7eb;
+
+          border-radius: 10px;
+
+          overflow: hidden;
+
+        }
+
+        td {
+
+          display: flex;
+
+          align-items: flex-start;
+
+          justify-content: space-between;
+
+          gap: 12px;
+
+          padding: 10px 0;
+
+          white-space: normal;
+
+          overflow-wrap: anywhere;
+
+        }
+
+        td:first-child {
+
+          border-top: 0;
+
+        }
+
+        td::before {
+
+          flex: 0 0 38%;
+
+          color: #6b7280;
+
+          font-size: 12px;
+
+          font-weight: 600;
+
+        }
+
+        td:nth-child(1)::before { content: 'Mã đơn'; }
+
+        td:nth-child(2)::before { content: 'Số điện thoại'; }
+
+        td:nth-child(3)::before { content: 'OTP'; }
+
+        td:nth-child(4)::before { content: 'Trạng thái'; }
+
+        td:nth-child(5)::before { content: 'Thời gian mua'; }
+
+        td:nth-child(6)::before { content: 'Thao tác'; }
+
+        .toast {
+
+          left: 12px;
+
+          right: 12px;
+
+          bottom: 12px;
+
+          max-width: none;
+
+        }
+
+      }
+
+    </style>
+
+  </head>
+
+  <body>
+
+    <div class="container">
+
+      <div class="card">
+
+        <h2>SMS Number Manager</h2>
+
+        <div id="roomStatus" style="font-size:12px;color:#6b7280;margin-bottom:12px">Thiết bị đang kết nối: 0</div>
+
+        <div class="token-row">
+
+          <button id="copyAllOtp" class="secondary-btn" type="button" disabled>Copy OTP</button>
+
+        </div>
+
+        <div class="controls">
+
+          <div class="field">
+
+            <label for="interval">Kiểm tra OTP (giây)</label>
+
+            <input id="interval" type="number" value="5" min="1" />
+
+          </div>
+
+          <div class="product-options" id="productOptions"><div class="product-option">Đang tải sản phẩm TikTok tại Mỹ...</div></div>
+<button id="localBuyButton" class="secondary-btn" type="button">Lấy số riêng thiết bị này</button>
+
+        </div>
+
+        <div class="table-wrap">
+
+          <table>
+
+            <thead>
+
+              <tr>
+
+                <th>Mã đơn</th>
+
+                <th>Số điện thoại</th>
+
+                <th>OTP</th>
+
+                <th>Trạng thái</th>
+
+                <th>Thời gian mua</th>
+
+                <th>Thao tác</th>
+
+              </tr>
+
+            </thead>
+
+            <tbody id="list"></tbody>
+
+          </table>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script src="./smscode.js"></script>
+
+    <script src="./order-time.js"></script>
+
+    <script src="./polling-registry.js"></script>
+
+    <script>
+
+      const elements = {
+
+        copyAllOtp: document.getElementById('copyAllOtp'),
+
+        interval: document.getElementById('interval'),
+
+
+        localBuyButton: document.getElementById('localBuyButton'),
+
+        list: document.getElementById('list'),
+
+        toast: document.getElementById('toast'),
+
+      }
+
+
+
+      const ROOM_ID = 'room-main'
+
+      let PRODUCT_ID = null
+
+      const deviceId = getDeviceId()
+
+      const processedCommands = new Set()
+
+      const socket = io()
+
+      let onlineCount = 0
+
+      let buying = false
+
+      let purchaseQueue = Promise.resolve()
+
+      let client = SmscodeApi.createSmscodeClient()
+
+      const productOptions = document.getElementById('productOptions')
+
+      loadUsTikTokProducts()
+
+      function getPriceValue(product) {
+        const price = product?.price
+        if (price && typeof price === 'object') return Number(price.amount ?? price.value ?? 0)
+        return Number(price ?? 0)
+      }
+
+      function formatProductPrice(product) {
+        const price = product?.price
+        if (price && typeof price === 'object' && price.currency) {
+          return `${price.currency === 'USD' ? '$' : ''}${price.amount ?? price.value ?? '—'}${price.currency !== 'USD' ? ' ' + price.currency : ''}`
+        }
+        const value = getPriceValue(product)
+        return Number.isFinite(value) && value > 0 ? `$${value.toFixed(4)}` : 'Giá xem trên SMSCode'
+      }
+
+      function chooseProduct(option) {
+        productOptions.querySelectorAll('.product-option').forEach(item => item.classList.remove('selected'))
+        option.classList.add('selected')
+        PRODUCT_ID = Number(option.dataset.productId)
+      }
+
+      async function loadUsTikTokProducts() {
+        productOptions.innerHTML = '<div class="product-option">Đang tải danh mục từ SMSCode...</div>'
+        try {
+          const countriesResponse = await client.getCountries()
+          const countries = Array.isArray(countriesResponse) ? countriesResponse
+            : (countriesResponse?.countries || countriesResponse?.items || countriesResponse?.results || [])
+          const countryName = item => String(item.name || item.country_name || item.title || '')
+          const countryCode = item => String(item.code || item.iso2 || item.iso_code || '').toUpperCase()
+          const regularCountry = countries.find(item =>
+            countryCode(item) === 'US' || /united states|\busa\b|\bamerica\b/i.test(countryName(item))
+          )
+          const virtualCountry = countries.find(item =>
+            /usa\s*\(virtual\)|united states.*virtual|\bvirtual\b/i.test(countryName(item))
+          )
+          const country = regularCountry || virtualCountry
+          if (!country) throw new Error('API không trả về quốc gia Mỹ (US).')
+
+          async function getTikTokProducts(countryItem) {
+            if (!countryItem) return []
+            const servicesResponse = await client.getServices(countryItem.id ?? countryItem.country_id)
+            const services = Array.isArray(servicesResponse) ? servicesResponse
+              : (servicesResponse?.services || servicesResponse?.items || servicesResponse?.results || [])
+            const service = services.find(item =>
+              /tiktok|douyin/i.test(`${item.name || item.service_name || item.code || item.slug || ''}`)
+            )
+            if (!service) return []
+            const productsResponse = await client.getProducts(
+              countryItem.id ?? countryItem.country_id,
+              service.id ?? service.platform_id ?? service.service_id
+            )
+            const products = Array.isArray(productsResponse) ? productsResponse
+              : (productsResponse?.products || productsResponse?.items || productsResponse?.results || [])
+            return products
+              .filter(item => item.active !== false && item.is_active !== false)
+              .sort((a, b) => getPriceValue(a) - getPriceValue(b))
+          }
+
+          const regularProducts = await getTikTokProducts(regularCountry || country)
+          const virtualProducts = virtualCountry && virtualCountry !== regularCountry
+            ? await getTikTokProducts(virtualCountry)
+            : []
+          if (!regularProducts.length && !virtualProducts.length) {
+            throw new Error('Hiện không có sản phẩm TikTok/Douyin Mỹ trong danh mục API.')
+          }
+
+          // Giữ ô 1 và ô 3 theo danh mục cũ; thay riêng ô 2 bằng sản phẩm thứ 2
+          // của danh mục USA (virtual), như lựa chọn khoảng $0.042 trong ảnh.
+          const displayProducts = regularProducts.slice(0, 3)
+          if (virtualProducts.length >= 2) {
+            if (displayProducts.length >= 2) displayProducts[1] = virtualProducts[1]
+            else displayProducts.push(virtualProducts[1])
+          } else if (virtualProducts.length === 1 && displayProducts.length >= 2) {
+            displayProducts[1] = virtualProducts[0]
+          }
+
+          if (!displayProducts.length) throw new Error('Hiện không có sản phẩm TikTok/Douyin Mỹ trong danh mục API.')
+
+          productOptions.innerHTML = ''
+          displayProducts.slice(0, 3).forEach((product, index) => {
+            const option = document.createElement('div')
+            option.className = `product-option${index === 0 ? ' selected' : ''}`
+            option.dataset.productId = String(product.id ?? product.product_id)
+            const name = document.createElement('div')
+            name.className = 'product-name'
+            name.textContent = `🇺🇸 ${product.name || (index === 1 ? 'TikTok / Douyin - US USA (virtual)' : 'TikTok / Douyin Mỹ')}`
+            const info = document.createElement('div')
+            info.className = 'product-info'
+            const stockRaw = product.available ?? product.available_count ?? product.stock ?? product.quantity_available ?? product.avail
+            const stock = Number(stockRaw)
+            info.textContent = `Còn ${stockRaw != null && Number.isFinite(stock) ? stock.toLocaleString('en-US') : 'không rõ'} số `
+            const price = document.createElement('span')
+            price.className = 'product-price'
+            price.textContent = formatProductPrice(product)
+            info.appendChild(price)
+            option.append(name, info)
+            option.addEventListener('click', () => chooseProduct(option))
+            productOptions.appendChild(option)
+          })
+          PRODUCT_ID = Number(displayProducts[0].id ?? displayProducts[0].product_id)
+          showToast(`Đã tải ${displayProducts.length} sản phẩm TikTok/Douyin Mỹ.`)
+        } catch (error) {
+          productOptions.innerHTML = ''
+          const message = document.createElement('div')
+          message.className = 'product-option'
+          message.textContent = `Không tải được sản phẩm Mỹ: ${error.message || error}. Kiểm tra cấu trúc phản hồi API SMSCode.`
+          productOptions.appendChild(message)
+          PRODUCT_ID = null
+          showToast(message.textContent)
+        }
+      }
+
+      function getDeviceId() {
+
+        let id = localStorage.getItem('deviceId')
+
+        if (!id) {
+
+          id = crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16))
+
+          localStorage.setItem('deviceId', id)
+
+        }
+
+        return id
+
+      }
+
+      function updateRoomStatus() {
+
+        document.getElementById('roomStatus').textContent = `Thiết bị đang kết nối: ${socket.connected ? onlineCount : 0}`
+
+        updateBuyButton()
+
+      }
+
+      socket.on('connect', () => {
+
+        socket.emit('join-room', { roomId: ROOM_ID, deviceId })
+
+        updateRoomStatus()
+
+      })
+
+      socket.on('disconnect', () => {
+
+        onlineCount = 0
+
+        updateRoomStatus()
+
+      })
+
+      socket.on('room-devices', devices => {
+
+        onlineCount = devices.length
+
+        updateRoomStatus()
+
+      })
+
+      socket.on('room-command', command => {
+
+        if (command.roomId !== ROOM_ID || processedCommands.has(command.commandId)) return
+
+        processedCommands.add(command.commandId)
+
+        if (processedCommands.size > 500) processedCommands.delete(processedCommands.values().next().value)
+
+        if (command.type === 'CLEAR_ALL') clearAllRows()
+
+      })
+
+      function sendRoomCommand(type) {
+
+        if (!socket.connected) return showToast('Socket mất kết nối. Vui lòng đợi kết nối lại.')
+
+        socket.emit('room-command', { roomId: ROOM_ID, commandId: crypto.randomUUID ? crypto.randomUUID() : makeIdempotencyKey(), type, senderDeviceId: deviceId })
+
+      }
+
+      const polling = PollingRegistry.createPollingRegistry()
+
+
+
+      elements.localBuyButton.addEventListener('click', queueNumberPurchase)
+
+      
+
+      updateRoomStatus()
+
+
+
+      async function copyPhoneWithoutFirstTwo(phoneNumber) {
+
+        const phone = String(phoneNumber || '').trim()
+        if (!phone) return false
+
+        const valueToCopy = phone.slice(1)
+        let copied = false
+
+        // Ưu tiên Clipboard API.
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(valueToCopy)
+            copied = true
+          }
+        } catch (error) {}
+
+        // Fallback cho Safari/iOS cũ hoặc trường hợp Clipboard API bị chặn.
+        if (!copied) {
+          try {
+            const textarea = document.createElement('textarea')
+            textarea.value = valueToCopy
+            textarea.setAttribute('readonly', '')
+            textarea.style.position = 'fixed'
+            textarea.style.top = '0'
+            textarea.style.left = '0'
+            textarea.style.width = '1px'
+            textarea.style.height = '1px'
+            textarea.style.opacity = '0.01'
+            textarea.style.fontSize = '16px'
+            document.body.appendChild(textarea)
+            textarea.focus({ preventScroll: true })
+            textarea.select()
+            textarea.setSelectionRange(0, valueToCopy.length)
+            copied = document.execCommand('copy')
+            textarea.remove()
+          } catch (error) {}
+        }
+
+        if (copied) {
+          showToast(`Đã copy: ${valueToCopy}`)
+        } else {
+          // iOS có thể chặn clipboard tự động sau khi request API hoàn tất.
+          // Hiện nút copy ngay trên dòng để người dùng chạm 1 lần nếu cần.
+          showToast(`Không tự copy được. Chạm số ${valueToCopy} để copy.`)
+        }
+
+        return copied
+      }
+
+
+      function queueNumberPurchase() {
+
+        purchaseQueue = purchaseQueue.then(createNumbers, createNumbers)
+
+      }
+
+
+
+      async function createNumbers() {
+
+        buying = true
+
+        const productId = PRODUCT_ID
+
+        if (!Number.isFinite(productId) || productId <= 0) {
+          buying = false
+          setBusy(elements.localBuyButton, false)
+          showToast('Chưa có sản phẩm Mỹ hợp lệ. Kiểm tra API/backend SMSCode rồi thử lại.')
+          return
+        }
+
+        const quantity = 1
+
+
+        setBusy(elements.localBuyButton, true, 'Đang tạo...')
+
+        try {
+
+          const result = await client.createOrder({
+
+            productId,
+
+            quantity,
+
+            idempotencyKey: makeIdempotencyKey(),
+
+          })
+
+          for (const order of result.orders || []) {
+
+            addRow(order)
+
+            startOtpPolling(order.id, Number(elements.interval.value) || 5)
+
+            const copied = await copyPhoneWithoutFirstTwo(order.phone_number)
+            if (!copied) {
+              const row = document.getElementById(`row-${order.id}`)
+              const phoneCopy = row?.querySelector('.copy')
+              if (phoneCopy) {
+                phoneCopy.classList.add('copy-fallback')
+                phoneCopy.title = 'Chạm để copy số điện thoại'
+                phoneCopy.dataset.copyValue = String(order.phone_number || '').trim().slice(1)
+              }
+            }
+
+          }
+
+          const created = (result.orders || []).length
+
+          const failed = Number(result.failed_count) || 0
+
+          showToast(`Đã tạo ${created} đơn${failed ? `, ${failed} đơn thất bại` : ''}.`)
+
+        } catch (error) {
+
+          showError(error)
+
+        } finally {
+
+          buying = false
+
+
+          setBusy(elements.localBuyButton, false, 'Lấy số riêng thiết bị này')
+
+          updateBuyButton()
+
+        }
+
+      }
+
+
+
+      function startOtpPolling(orderId, intervalSeconds) {
+
+        const schedule = () => polling.set(orderId, setTimeout(poll, intervalSeconds * 1000))
+
+        async function poll() {
+
+          try {
+
+            const order = await client.getOrder(orderId)
+
+            if (!document.getElementById(`row-${orderId}`)) return polling.stop(orderId)
+
+            updateOrderRow(order)
+
+            if (order.status === 'OTP_RECEIVED' || order.otp_code) return polling.stop(orderId)
+
+            if (['COMPLETED', 'CANCELED', 'EXPIRED'].includes(order.status)) return polling.stop(orderId)
+
+          } catch (error) {
+
+            if (!document.getElementById(`row-${orderId}`)) return polling.stop(orderId)
+
+            setOrderStatus(orderId, `Lỗi: ${error.message}`, 'failed')
+
+            return polling.stop(orderId)
+
+          }
+
+          schedule()
+
+        }
+
+        schedule()
+
+      }
+
+
+
+      function addRow(order) {
+
+        const row = document.createElement('tr')
+
+        row.id = `row-${order.id}`
+
+        row.append(
+
+          cell(String(order.id)),
+
+          copyCell(order.phone_number ? String(order.phone_number).trim().slice(1) : '-'),
+
+          identifiedCell(`otp-${order.id}`, order.otp_code || '-'),
+
+          statusCell(order.id, statusText(order.status), order.otp_code ? 'success' : 'waiting'),
+
+          identifiedCell(`time-${order.id}`, OrderTime.formatPurchaseTime(order)),
+
+          actionCell(order.id),
+
+        )
+
+        elements.list.prepend(row)
+
+        updateCopyOtpButton()
+
+      }
+
+
+
+      function actionCell(orderId) {
+
+        const td = document.createElement('td')
+
+        const button = document.createElement('button')
+
+        button.type = 'button'
+
+        button.className = 'row-delete'
+
+        button.textContent = 'Xóa'
+
+        button.addEventListener('click', () => removeOrderRow(orderId))
+
+        td.append(button)
+
+        return td
+
+      }
+
+
+
+      function removeOrderRow(orderId) {
+
+        polling.stop(orderId)
+
+        document.getElementById(`row-${orderId}`)?.remove()
+
+        updateCopyOtpButton()
+
+      }
+
+
+
+      function clearAllRows() {
+
+        polling.stopAll()
+
+        elements.list.replaceChildren()
+
+        updateCopyOtpButton()
+
+      }
+
+
+
+      function updateCopyOtpButton() {
+
+
+      }
+
+
+
+      function updateOrderRow(order) {
+
+        const otpElement = document.getElementById(`otp-${order.id}`)
+
+        if (order.otp_code && otpElement) {
+
+          otpElement.replaceChildren(copySpan(order.otp_code))
+
+          setOrderStatus(order.id, 'Đã nhận OTP', 'success')
+
+        } else {
+
+          const terminal = ['COMPLETED', 'CANCELED', 'EXPIRED'].includes(order.status)
+
+          setOrderStatus(order.id, statusText(order.status), terminal ? 'failed' : 'waiting')
+
+        }
+
+      }
+
+
+
+      function statusText(status) {
+
+        const labels = {
+
+          ACTIVE: 'Đang chờ OTP',
+
+          OTP_RECEIVED: 'Đã nhận OTP',
+
+          COMPLETED: 'Hoàn tất',
+
+          CANCELED: 'Đã hủy',
+
+          EXPIRED: 'Hết hạn',
+
+        }
+
+        return labels[status] || status || 'Đang chờ OTP'
+
+      }
+
+
+
+      function cell(text) {
+
+        const td = document.createElement('td')
+
+        td.textContent = text
+
+        return td
+
+      }
+
+
+
+      function identifiedCell(id, text) {
+
+        const td = cell(text)
+
+        td.id = id
+
+        return td
+
+      }
+
+
+
+      function copySpan(text) {
+
+        const span = document.createElement('span')
+
+        span.className = 'copy'
+
+        span.textContent = text
+
+        span.addEventListener('click', () => copyText(text))
+
+        return span
+
+      }
+
+
+
+      function copyCell(text) {
+
+        const td = document.createElement('td')
+
+        td.append(copySpan(text))
+
+        return td
+
+      }
+
+
+
+      function statusCell(orderId, text, className) {
+
+        const td = document.createElement('td')
+
+        const span = document.createElement('span')
+
+        span.id = `status-${orderId}`
+
+        span.className = `status ${className}`
+
+        span.textContent = text
+
+        td.append(span)
+
+        return td
+
+      }
+
+
+
+      function setOrderStatus(orderId, text, className) {
+
+        const status = document.getElementById(`status-${orderId}`)
+
+        if (!status) return
+
+        status.textContent = text
+
+        status.className = `status ${className}`
+
+      }
+
+
+
+      function makeIdempotencyKey() {
+
+        if (crypto.randomUUID) return `order-${crypto.randomUUID()}`
+
+        return `order-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
+      }
+
+
+
+      function setBusy(button, busy, label) {
+
+        button.disabled = busy
+
+        button.textContent = label
+
+      }
+
+
+
+      function updateBuyButton() {
+
+
+        elements.localBuyButton.disabled = buying
+
+      }
+
+
+
+      async function copyText(text) {
+
+        try {
+
+          await navigator.clipboard.writeText(text)
+
+        } catch {
+
+          const textarea = document.createElement('textarea')
+
+          textarea.value = text
+
+          document.body.appendChild(textarea)
+
+          textarea.select()
+
+          document.execCommand('copy')
+
+          textarea.remove()
+
+        }
+
+        showToast(`Đã copy: ${text}`)
+
+      }
+
+
+
+      function showError(error) {
+
+        showToast(error?.message || 'Đã xảy ra lỗi.')
+
+      }
+
+
+
+      let toastTimer
+
+      function showToast(message) {
+
+        clearTimeout(toastTimer)
+
+        elements.toast.textContent = message
+
+        elements.toast.classList.add('show')
+
+        toastTimer = setTimeout(() => elements.toast.classList.remove('show'), 3500)
+
+      }
+
+    </script>
+
+  </body>
+
+</html>
