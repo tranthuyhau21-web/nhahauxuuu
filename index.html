@@ -615,6 +615,43 @@
         margin-left: 5px;
       }
 
+
+
+      .country-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        max-height: 190px;
+        overflow-y: auto;
+        padding: 8px;
+        margin-top: 8px;
+        border: 1px solid #293244;
+        border-radius: 10px;
+        background: #0b1220;
+      }
+      .country-chip {
+        min-height: 34px;
+        height: auto;
+        padding: 7px 12px;
+        border: 1px solid #263244;
+        border-radius: 9px;
+        background: #101827;
+        color: #aab7cf;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .country-chip:hover,
+      .country-chip.selected {
+        color: #fff;
+        border-color: #3978ed;
+        background: #172c50;
+      }
+      .country-loading {
+        color: #9ca3af;
+        font-size: 13px;
+        padding: 8px;
+      }
       @media (max-width: 600px) {
 
         body {
@@ -786,6 +823,24 @@
         <div class="controls">
 
           <div class="field">
+            <label for="providerSelect">Nhà cung cấp</label>
+            <select id="providerSelect">
+              <option value="smscode">SMSCode</option>
+              <option value="grizzly">GrizzlySMS</option>
+            </select>
+          </div>
+          <div class="field" id="countryField" style="width:100%;flex-basis:100%">
+            <label for="countrySearch">Chọn quốc gia SMSCode</label>
+            <input id="countrySearch" type="search" placeholder="Tìm quốc gia..." autocomplete="off" />
+            <div id="countryGrid" class="country-grid">
+              <span class="country-loading">Đang tải danh sách quốc gia...</span>
+            </div>
+          </div>
+          <div class="field" id="balanceField" style="width:190px">
+            <label>Số dư</label>
+            <div id="providerBalance" style="height:42px;display:flex;align-items:center;padding:0 12px;border:1px solid #d1d5db;border-radius:8px;background:#f9fafb">—</div>
+          </div>
+          <div class="field">
 
             <label for="interval">Kiểm tra OTP (giây)</label>
 
@@ -793,7 +848,7 @@
 
           </div>
 
-          <div class="product-options" id="productOptions"><div class="product-option">Đang tải sản phẩm TikTok tại Mỹ...</div></div>
+          <div class="product-options" id="productOptions"><div class="product-option">Đang tải sản phẩm...</div></div>
 <button id="localBuyButton" class="secondary-btn" type="button">Lấy số riêng thiết bị này</button>
 
         </div>
@@ -849,6 +904,11 @@
         copyAllOtp: document.getElementById('copyAllOtp'),
 
         interval: document.getElementById('interval'),
+        providerSelect: document.getElementById('providerSelect'),
+        countrySearch: document.getElementById('countrySearch'),
+        countryGrid: document.getElementById('countryGrid'),
+        countryField: document.getElementById('countryField'),
+        providerBalance: document.getElementById('providerBalance'),
 
 
         localBuyButton: document.getElementById('localBuyButton'),
@@ -878,10 +938,58 @@
       let purchaseQueue = Promise.resolve()
 
       let client = SmscodeApi.createSmscodeClient()
+      // Trạng thái nhà cung cấp và thông tin từng đơn hàng
+      let activeProvider = 'smscode'
+      let selectedCallingCode = '1'
+      let availableCountries = []
+      let selectedCountry = null
+      let selectedGrizzlyMaxPrice = 0.015
+      const orderProviders = new Map()
+      let applyingRemoteSettings = false
+      let currentSharedRevision = 0
 
       const productOptions = document.getElementById('productOptions')
 
-      loadUsTikTokProducts()
+      loadProviderProducts()
+      elements.providerSelect.addEventListener('change', async () => {
+        activeProvider = elements.providerSelect.value
+        PRODUCT_ID = null
+        elements.countryField.style.display = activeProvider === 'smscode' ? '' : 'none'
+        await loadProviderProducts()
+        updateBuyButton()
+        broadcastSharedSettings()
+      })
+
+      elements.countrySearch.addEventListener('input', renderCountryChips)
+
+      function asArray(value) {
+        if (Array.isArray(value)) return value
+        if (Array.isArray(value?.data)) return value.data
+        if (Array.isArray(value?.items)) return value.items
+        if (Array.isArray(value?.results)) return value.results
+        if (Array.isArray(value?.countries)) return value.countries
+        if (Array.isArray(value?.services)) return value.services
+        if (Array.isArray(value?.products)) return value.products
+        return []
+      }
+
+      function textOf(item, keys) {
+        for (const key of keys) {
+          const value = item?.[key]
+          if (value != null && String(value).trim()) return String(value).trim()
+        }
+        return ''
+      }
+
+      function callingCodeOf(country) {
+        let code = textOf(country, ['calling_code', 'phone_code', 'dial_code', 'callingCode', 'phoneCode', 'prefix', 'callingCode'])
+        if (!code) {
+          const iso = textOf(country, ['iso2', 'iso', 'code', 'country_code']).toUpperCase()
+          const known = { US: '1', USA: '1', CO: '57', COL: '57', VN: '84', VNM: '84' }
+          code = known[iso] || ''
+        }
+        return code.replace(/^\+/, '').replace(/\D/g, '')
+      }
 
       function getPriceValue(product) {
         const price = product?.price
@@ -898,82 +1006,219 @@
         return Number.isFinite(value) && value > 0 ? `$${value.toFixed(4)}` : 'Giá xem trên SMSCode'
       }
 
-      function chooseProduct(option) {
+      function chooseProduct(option, sync = true) {
+        if (!option) return
         productOptions.querySelectorAll('.product-option').forEach(item => item.classList.remove('selected'))
         option.classList.add('selected')
         PRODUCT_ID = Number(option.dataset.productId)
+        if (sync) broadcastSharedSettings()
       }
 
-      async function loadUsTikTokProducts() {
-        productOptions.innerHTML = '<div class="product-option">Đang tải danh mục từ SMSCode...</div>'
-        try {
-          const countriesResponse = await client.getCountries()
-          const countries = Array.isArray(countriesResponse) ? countriesResponse
-            : (countriesResponse?.countries || countriesResponse?.items || countriesResponse?.results || [])
-          const countryName = item => String(item.name || item.country_name || item.title || '')
-          const countryCode = item => String(item.code || item.iso2 || item.iso_code || '').toUpperCase()
-          const regularCountry = countries.find(item =>
-            countryCode(item) === 'US' || /united states|\busa\b|\bamerica\b/i.test(countryName(item))
-          )
-          const virtualCountry = countries.find(item =>
-            /usa\s*\(virtual\)|united states.*virtual|\bvirtual\b/i.test(countryName(item))
-          )
-          const country = regularCountry || virtualCountry
-          if (!country) throw new Error('API không trả về quốc gia Mỹ (US).')
+      let loadingProducts = false
 
-          async function getTikTokProducts(countryItem) {
-            if (!countryItem) return []
-            const servicesResponse = await client.getServices(countryItem.id ?? countryItem.country_id)
-            const services = Array.isArray(servicesResponse) ? servicesResponse
-              : (servicesResponse?.services || servicesResponse?.items || servicesResponse?.results || [])
-            const service = services.find(item =>
-              /tiktok|douyin/i.test(`${item.name || item.service_name || item.code || item.slug || ''}`)
-            )
-            if (!service) return []
-            const productsResponse = await client.getProducts(
-              countryItem.id ?? countryItem.country_id,
-              service.id ?? service.platform_id ?? service.service_id
-            )
-            const products = Array.isArray(productsResponse) ? productsResponse
-              : (productsResponse?.products || productsResponse?.items || productsResponse?.results || [])
-            return products
-              .filter(item => item.active !== false && item.is_active !== false)
-              .sort((a, b) => getPriceValue(a) - getPriceValue(b))
-          }
+      function countryIdOf(country) {
+        return Number(country.id ?? country.country_id)
+      }
 
-          const regularProducts = await getTikTokProducts(regularCountry || country)
-          const virtualProducts = virtualCountry && virtualCountry !== regularCountry
-            ? await getTikTokProducts(virtualCountry)
-            : []
-          if (!regularProducts.length && !virtualProducts.length) {
-            throw new Error('Hiện không có sản phẩm TikTok/Douyin Mỹ trong danh mục API.')
-          }
+      function countryNameOf(country) {
+        return textOf(country, ['name', 'country_name', 'title']) || `Quốc gia ${countryIdOf(country)}`
+      }
 
-          // Giữ ô 1 và ô 3 theo danh mục cũ; thay riêng ô 2 bằng sản phẩm thứ 2
-          // của danh mục USA (virtual), như lựa chọn khoảng $0.042 trong ảnh.
-          const displayProducts = regularProducts.slice(0, 3)
-          if (virtualProducts.length >= 2) {
-            if (displayProducts.length >= 2) displayProducts[1] = virtualProducts[1]
-            else displayProducts.push(virtualProducts[1])
-          } else if (virtualProducts.length === 1 && displayProducts.length >= 2) {
-            displayProducts[1] = virtualProducts[0]
-          }
+      function countryIsoOf(country) {
+        return textOf(country, ['iso2', 'iso', 'code', 'country_code']).toUpperCase()
+      }
 
-          if (!displayProducts.length) throw new Error('Hiện không có sản phẩm TikTok/Douyin Mỹ trong danh mục API.')
+      function renderCountryChips() {
+        if (!elements.countryGrid) return
+        const query = String(elements.countrySearch?.value || '').trim().toLowerCase()
+        elements.countryGrid.replaceChildren()
 
+        const filtered = availableCountries.filter(country => {
+          const name = countryNameOf(country).toLowerCase()
+          const iso = countryIsoOf(country).toLowerCase()
+          const dial = callingCodeOf(country)
+          return !query || name.includes(query) || iso.includes(query) || dial.includes(query)
+        })
+
+        if (!filtered.length) {
+          const empty = document.createElement('span')
+          empty.className = 'country-loading'
+          empty.textContent = 'Không tìm thấy quốc gia.'
+          elements.countryGrid.appendChild(empty)
+          return
+        }
+
+        filtered.forEach(country => {
+          const id = countryIdOf(country)
+          const iso = countryIsoOf(country)
+          const dial = callingCodeOf(country)
+          const chip = document.createElement('button')
+          chip.type = 'button'
+          chip.className = 'country-chip' +
+            (selectedCountry && countryIdOf(selectedCountry) === id ? ' selected' : '')
+          chip.textContent = `${iso ? iso + ' ' : ''}${countryNameOf(country)}${dial ? ' +' + dial : ''}`
+          chip.title = countryNameOf(country)
+          chip.addEventListener('click', async () => {
+            selectedCountry = country
+            selectedCallingCode = dial
+            renderCountryChips()
+            PRODUCT_ID = null
+            await loadTikTokProductsForSelectedCountry()
+            updateBuyButton()
+            broadcastSharedSettings()
+          })
+          elements.countryGrid.appendChild(chip)
+        })
+      }
+
+      async function loadProviderProducts() {
+        if (loadingProducts) return
+        loadingProducts = true
+        PRODUCT_ID = null
+        productOptions.innerHTML = ''
+
+        const showMessage = text => {
           productOptions.innerHTML = ''
-          displayProducts.slice(0, 3).forEach((product, index) => {
+          const message = document.createElement('div')
+          message.className = 'product-option'
+          message.textContent = text
+          productOptions.appendChild(message)
+          PRODUCT_ID = null
+        }
+
+        try {
+          if (activeProvider === 'grizzly') {
+            selectedCallingCode = '1'
+            elements.countryField.style.display = 'none'
+            const catalogResponse = await fetch('/api/grizzly/catalog')
+            const catalogPayload = await catalogResponse.json()
+            if (!catalogResponse.ok || !catalogPayload.success) throw new Error(catalogPayload.error?.message || 'Không tải được danh mục GrizzlySMS.')
+            for (const priceCap of [0.015, 0.025]) {
+              const option = document.createElement('div')
+              option.className = 'product-option' + (priceCap === 0.015 ? ' selected' : '')
+              option.dataset.maxPrice = String(priceCap)
+              const name = document.createElement('div')
+              name.className = 'product-name'
+              name.textContent = `TikTok USA virtual · tối đa $${priceCap.toFixed(3)}`
+              const info = document.createElement('div')
+              info.className = 'product-info'
+              info.textContent = 'GrizzlySMS · chỉ mua nếu giá thực tế không vượt mức đã chọn'
+              option.append(name, info)
+              option.addEventListener('click', () => {
+                productOptions.querySelectorAll('.product-option').forEach(item => item.classList.remove('selected'))
+                option.classList.add('selected')
+                PRODUCT_ID = priceCap === 0.015 ? 15 : 25
+                selectedGrizzlyMaxPrice = priceCap
+                broadcastSharedSettings()
+              })
+              productOptions.appendChild(option)
+            }
+            PRODUCT_ID = 15
+            selectedGrizzlyMaxPrice = 0.015
+            await loadProviderBalance()
+            return
+          }
+
+          elements.countryField.style.display = ''
+          if (!availableCountries.length) {
+            availableCountries = asArray(await client.getCountries())
+              .filter(country => Number(country.id ?? country.country_id) > 0)
+              .sort((a, b) => textOf(a, ['name', 'country_name', 'title'])
+                .localeCompare(textOf(b, ['name', 'country_name', 'title'])))
+          }
+
+          if (!availableCountries.length) {
+            throw new Error('SMSCode không trả về danh sách quốc gia.')
+          }
+
+          const previousId = selectedCountry ? countryIdOf(selectedCountry) : null
+
+          selectedCountry = availableCountries.find(country =>
+            countryIdOf(country) === previousId
+          ) || availableCountries.find(country => {
+            const iso = countryIsoOf(country)
+            const name = countryNameOf(country).toLowerCase()
+            return ['US', 'USA'].includes(iso) || name.includes('united states') || name === 'usa'
+          }) || availableCountries[0]
+
+          selectedCallingCode = callingCodeOf(selectedCountry)
+          renderCountryChips()
+
+          await loadTikTokProductsForSelectedCountry()
+          await loadProviderBalance()
+        } catch (error) {
+          showMessage(`Không tải được danh mục: ${error.message || error}`)
+          showToast(error.message || String(error))
+        } finally {
+          loadingProducts = false
+          updateBuyButton()
+        }
+      }
+
+      async function loadTikTokProductsForSelectedCountry() {
+        PRODUCT_ID = null
+        productOptions.innerHTML = ''
+
+        if (!selectedCountry) {
+          const message = document.createElement('div')
+          message.className = 'product-option'
+          message.textContent = 'Hãy chọn quốc gia.'
+          productOptions.appendChild(message)
+          return
+        }
+
+        const countryId = Number(selectedCountry.id ?? selectedCountry.country_id)
+        const countryName = textOf(selectedCountry, ['name', 'country_name', 'title']) || 'Quốc gia'
+        selectedCallingCode = callingCodeOf(selectedCountry)
+
+        if (!Number.isFinite(countryId) || countryId <= 0) {
+          throw new Error('ID quốc gia SMSCode không hợp lệ.')
+        }
+
+        const services = asArray(await client.getServices(countryId))
+        const tiktokServices = services.filter(item => {
+          const name = textOf(item, ['name', 'service_name', 'title', 'platform_name']).toLowerCase()
+          const slug = textOf(item, ['slug', 'code', 'platform', 'service']).toLowerCase()
+          return name.includes('tiktok') || slug.includes('tiktok')
+        })
+
+        if (!tiktokServices.length) {
+          const message = document.createElement('div')
+          message.className = 'product-option'
+          message.textContent = `SMSCode không có dịch vụ TikTok tại ${countryName}.`
+          productOptions.appendChild(message)
+          return
+        }
+
+        let productCount = 0
+        for (const service of tiktokServices) {
+          const serviceId = Number(service.id ?? service.platform_id ?? service.service_id)
+          if (!Number.isFinite(serviceId) || serviceId <= 0) continue
+
+          const products = asArray(await client.getProducts(countryId, serviceId))
+          products.forEach(product => {
+            const id = Number(product.id ?? product.product_id)
+            if (!Number.isFinite(id) || id <= 0) return
+
             const option = document.createElement('div')
-            option.className = `product-option${index === 0 ? ' selected' : ''}`
-            option.dataset.productId = String(product.id ?? product.product_id)
+            option.className = 'product-option'
+            option.dataset.productId = String(id)
+
             const name = document.createElement('div')
             name.className = 'product-name'
-            name.textContent = `🇺🇸 ${product.name || (index === 1 ? 'TikTok / Douyin - US USA (virtual)' : 'TikTok / Douyin Mỹ')}`
+            name.textContent = product.name || product.product_name ||
+              textOf(service, ['name', 'service_name', 'title']) || 'TikTok'
+
             const info = document.createElement('div')
             info.className = 'product-info'
-            const stockRaw = product.available ?? product.available_count ?? product.stock ?? product.quantity_available ?? product.avail
+            const stockRaw = product.available ?? product.available_count ??
+              product.stock ?? product.quantity_available ?? product.avail
             const stock = Number(stockRaw)
-            info.textContent = `Còn ${stockRaw != null && Number.isFinite(stock) ? stock.toLocaleString('en-US') : 'không rõ'} số `
+            const stockText = stockRaw != null && Number.isFinite(stock)
+              ? stock.toLocaleString('en-US')
+              : 'không rõ'
+            info.textContent = `${countryName}${selectedCallingCode ? ` (+${selectedCallingCode})` : ''} · Còn ${stockText} số `
+
             const price = document.createElement('span')
             price.className = 'product-price'
             price.textContent = formatProductPrice(product)
@@ -981,17 +1226,33 @@
             option.append(name, info)
             option.addEventListener('click', () => chooseProduct(option))
             productOptions.appendChild(option)
+            productCount++
           })
-          PRODUCT_ID = Number(displayProducts[0].id ?? displayProducts[0].product_id)
-          showToast(`Đã tải ${displayProducts.length} sản phẩm TikTok/Douyin Mỹ.`)
-        } catch (error) {
-          productOptions.innerHTML = ''
+        }
+
+        if (!productCount) {
           const message = document.createElement('div')
           message.className = 'product-option'
-          message.textContent = `Không tải được sản phẩm Mỹ: ${error.message || error}. Kiểm tra cấu trúc phản hồi API SMSCode.`
+          message.textContent = `Không có sản phẩm TikTok khả dụng tại ${countryName}.`
           productOptions.appendChild(message)
-          PRODUCT_ID = null
-          showToast(message.textContent)
+          return
+        }
+
+        chooseProduct(productOptions.querySelector('.product-option[data-product-id]'), false)
+      }
+
+      async function loadProviderBalance() {
+        if (activeProvider === 'grizzly') {
+          try {
+            const result = await fetch('/api/grizzly/balance').then(r => r.json())
+            if (!result.success) throw new Error(result.error?.message || 'Không lấy được số dư')
+            const value = result.data?.balance ?? result.data?.amount ?? result.data
+            elements.providerBalance.textContent = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '—')
+          } catch (error) {
+            elements.providerBalance.textContent = 'Không tải được'
+          }
+        } else {
+          elements.providerBalance.textContent = 'SMSCode'
         }
       }
 
@@ -1020,11 +1281,13 @@
       }
 
       socket.on('connect', () => {
-
         socket.emit('join-room', { roomId: ROOM_ID, deviceId })
-
         updateRoomStatus()
+      })
 
+      socket.on('room-settings', async payload => {
+        if (!payload || !payload.settings || payload.senderDeviceId === deviceId) return
+        await applySharedSettings(payload.settings, payload.revision || 0)
       })
 
       socket.on('disconnect', () => {
@@ -1052,6 +1315,7 @@
         if (processedCommands.size > 500) processedCommands.delete(processedCommands.values().next().value)
 
         if (command.type === 'CLEAR_ALL') clearAllRows()
+        if (command.type === 'BUY_ALL') queueNumberPurchase()
 
       })
 
@@ -1061,6 +1325,93 @@
 
         socket.emit('room-command', { roomId: ROOM_ID, commandId: crypto.randomUUID ? crypto.randomUUID() : makeIdempotencyKey(), type, senderDeviceId: deviceId })
 
+      }
+
+      function sharedSettingsSnapshot() {
+        return {
+          provider: activeProvider,
+          countryId: selectedCountry ? countryIdOf(selectedCountry) : null,
+          countryName: selectedCountry ? countryNameOf(selectedCountry) : null,
+          callingCode: selectedCallingCode || '',
+          productId: Number.isFinite(PRODUCT_ID) ? PRODUCT_ID : null,
+          maxPrice: selectedGrizzlyMaxPrice,
+          interval: Math.max(1, Math.min(60, Number(elements.interval.value) || 5)),
+        }
+      }
+
+      function broadcastSharedSettings() {
+        if (applyingRemoteSettings || !socket.connected) return
+        socket.emit('room-settings', {
+          roomId: ROOM_ID,
+          senderDeviceId: deviceId,
+          settings: sharedSettingsSnapshot(),
+        })
+      }
+
+      async function applySharedSettings(settings, revision) {
+        if (!settings || applyingRemoteSettings) return
+        if (revision && revision <= currentSharedRevision) return
+        applyingRemoteSettings = true
+
+        try {
+          const nextProvider = settings.provider === 'grizzly' ? 'grizzly' : 'smscode'
+          const providerChanged = activeProvider !== nextProvider
+          const nextCountryId = Number(settings.countryId || 0)
+          const countryChanged = nextProvider === 'smscode' &&
+            nextCountryId > 0 &&
+            (!selectedCountry || countryIdOf(selectedCountry) !== nextCountryId)
+
+          if (settings.interval) {
+            elements.interval.value = String(settings.interval)
+          }
+
+          // Chỉ tải danh mục khi đổi nhà cung cấp.
+          if (providerChanged) {
+            activeProvider = nextProvider
+            elements.providerSelect.value = activeProvider
+            elements.countryField.style.display = activeProvider === 'smscode' ? '' : 'none'
+            await loadProviderProducts()
+          }
+
+          // Chỉ tải sản phẩm lại khi quốc gia thực sự thay đổi.
+          if (!providerChanged && countryChanged && !loadingProducts) {
+            const targetCountry = availableCountries.find(country =>
+              countryIdOf(country) === nextCountryId
+            )
+
+            if (targetCountry) {
+              selectedCountry = targetCountry
+              selectedCallingCode = callingCodeOf(targetCountry)
+              renderCountryChips()
+              await loadTikTokProductsForSelectedCountry()
+            }
+          }
+
+          if (activeProvider === 'smscode' && settings.productId != null) {
+            const targetProduct = productOptions.querySelector(
+              `.product-option[data-product-id="${Number(settings.productId)}"]`
+            )
+            if (targetProduct) chooseProduct(targetProduct, false)
+          }
+
+          if (activeProvider === 'grizzly') {
+            selectedCallingCode = '1'
+            if ([0.015, 0.025].includes(Number(settings.maxPrice))) {
+              selectedGrizzlyMaxPrice = Number(settings.maxPrice)
+              PRODUCT_ID = selectedGrizzlyMaxPrice === 0.015 ? 15 : 25
+              productOptions.querySelectorAll('.product-option').forEach(option => {
+                option.classList.toggle('selected', Number(option.dataset.maxPrice) === selectedGrizzlyMaxPrice)
+              })
+            }
+          }
+
+          if (revision) currentSharedRevision = revision
+          updateBuyButton()
+        } catch (error) {
+          showToast(`Không đồng bộ được cấu hình: ${error.message || error}`)
+        } finally {
+          applyingRemoteSettings = false
+        }
       }
 
       const polling = PollingRegistry.createPollingRegistry()
@@ -1075,23 +1426,25 @@
 
 
 
-      async function copyPhoneWithoutFirstTwo(phoneNumber) {
+      function normalizePhone(phoneNumber, callingCode = selectedCallingCode) {
+        let phone = String(phoneNumber || '').trim().replace(/[\\s().-]/g, '')
+        if (!phone) return ''
+        const code = String(callingCode || '').replace(/^\\+/, '').replace(/\\D/g, '')
+        if (code && phone.startsWith('+' + code)) return phone.slice(code.length + 1)
+        if (code && phone.startsWith(code)) return phone.slice(code.length)
+        return phone.replace(/^\\+/, '')
+      }
 
-        const phone = String(phoneNumber || '').trim()
-        if (!phone) return false
-
-        const valueToCopy = phone.slice(1)
+      async function copyPhoneWithoutFirstTwo(phoneNumber, callingCode = selectedCallingCode) {
+        const valueToCopy = normalizePhone(phoneNumber, callingCode)
+        if (!valueToCopy) return false
         let copied = false
-
-        // Ưu tiên Clipboard API.
         try {
           if (navigator.clipboard && window.isSecureContext) {
             await navigator.clipboard.writeText(valueToCopy)
             copied = true
           }
         } catch (error) {}
-
-        // Fallback cho Safari/iOS cũ hoặc trường hợp Clipboard API bị chặn.
         if (!copied) {
           try {
             const textarea = document.createElement('textarea')
@@ -1112,18 +1465,10 @@
             textarea.remove()
           } catch (error) {}
         }
-
-        if (copied) {
-          showToast(`Đã copy: ${valueToCopy}`)
-        } else {
-          // iOS có thể chặn clipboard tự động sau khi request API hoàn tất.
-          // Hiện nút copy ngay trên dòng để người dùng chạm 1 lần nếu cần.
-          showToast(`Không tự copy được. Chạm số ${valueToCopy} để copy.`)
-        }
-
+        if (copied) showToast(`Đã copy: ${valueToCopy}`)
+        else showToast(`Không tự copy được. Chạm số ${valueToCopy} để copy.`)
         return copied
       }
-
 
       function queueNumberPurchase() {
 
@@ -1134,78 +1479,63 @@
 
 
       async function createNumbers() {
-
         buying = true
-
+        const provider = activeProvider
         const productId = PRODUCT_ID
-
-        if (!Number.isFinite(productId) || productId <= 0) {
+        if (provider === 'smscode' && (!Number.isFinite(productId) || productId <= 0)) {
           buying = false
           setBusy(elements.localBuyButton, false)
-          showToast('Chưa có sản phẩm Mỹ hợp lệ. Kiểm tra API/backend SMSCode rồi thử lại.')
+          showToast('Chưa có sản phẩm SMSCode hợp lệ.')
           return
         }
-
         const quantity = 1
-
-
+        const callingCode = provider === 'grizzly' ? '1' : selectedCallingCode
         setBusy(elements.localBuyButton, true, 'Đang tạo...')
-
         try {
-
-          const result = await client.createOrder({
-
-            productId,
-
-            quantity,
-
-            idempotencyKey: makeIdempotencyKey(),
-
-          })
+          let result
+          if (provider === 'grizzly') {
+            const response = await fetch('/api/grizzly/orders/create', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ maxPrice: selectedGrizzlyMaxPrice })
+            })
+            const payload = await response.json()
+            if (!response.ok || !payload.success) throw new Error(payload.error?.message || 'Không thuê được số GrizzlySMS.')
+            result = payload.data
+          } else {
+            result = await client.createOrder({
+              productId,
+              quantity,
+              idempotencyKey: makeIdempotencyKey(),
+            })
+          }
 
           for (const order of result.orders || []) {
-
-            addRow(order)
-
+            orderProviders.set(String(order.id), { provider, callingCode })
+            addRow({ ...order, _provider: provider, _callingCode: callingCode })
             startOtpPolling(order.id, Number(elements.interval.value) || 5)
-
-            const copied = await copyPhoneWithoutFirstTwo(order.phone_number)
+            const copied = await copyPhoneWithoutFirstTwo(order.phone_number, callingCode)
             if (!copied) {
               const row = document.getElementById(`row-${order.id}`)
               const phoneCopy = row?.querySelector('.copy')
               if (phoneCopy) {
                 phoneCopy.classList.add('copy-fallback')
                 phoneCopy.title = 'Chạm để copy số điện thoại'
-                phoneCopy.dataset.copyValue = String(order.phone_number || '').trim().slice(1)
+                phoneCopy.dataset.copyValue = normalizePhone(order.phone_number, callingCode)
               }
             }
-
           }
-
           const created = (result.orders || []).length
-
           const failed = Number(result.failed_count) || 0
-
           showToast(`Đã tạo ${created} đơn${failed ? `, ${failed} đơn thất bại` : ''}.`)
-
         } catch (error) {
-
           showError(error)
-
         } finally {
-
           buying = false
-
-
           setBusy(elements.localBuyButton, false, 'Lấy số riêng thiết bị này')
-
           updateBuyButton()
-
         }
-
       }
-
-
 
       function startOtpPolling(orderId, intervalSeconds) {
 
@@ -1215,7 +1545,16 @@
 
           try {
 
-            const order = await client.getOrder(orderId)
+            const providerInfo = orderProviders.get(String(orderId)) || { provider: 'smscode' }
+            let order
+            if (providerInfo.provider === 'grizzly') {
+              const response = await fetch(`/api/grizzly/orders/${encodeURIComponent(orderId)}`)
+              const payload = await response.json()
+              if (!response.ok || !payload.success) throw new Error(payload.error?.message || 'Lỗi kiểm tra OTP GrizzlySMS')
+              order = payload.data
+            } else {
+              order = await client.getOrder(orderId)
+            }
 
             if (!document.getElementById(`row-${orderId}`)) return polling.stop(orderId)
 
@@ -1250,12 +1589,15 @@
         const row = document.createElement('tr')
 
         row.id = `row-${order.id}`
+        const provider = order._provider || activeProvider
+        const callingCode = order._callingCode || (provider === 'grizzly' ? '1' : selectedCallingCode)
+        orderProviders.set(String(order.id), { provider, callingCode })
 
         row.append(
 
           cell(String(order.id)),
 
-          copyCell(order.phone_number ? String(order.phone_number).trim().slice(1) : '-'),
+          copyCell(order.phone_number ? normalizePhone(order.phone_number, callingCode) : '-', normalizePhone(order.phone_number, callingCode)),
 
           identifiedCell(`otp-${order.id}`, order.otp_code || '-'),
 
